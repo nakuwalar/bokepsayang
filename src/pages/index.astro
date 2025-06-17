@@ -4,6 +4,7 @@ import VideoCard from '../components/VideoCard.astro';
 import path from 'path';
 import fs from 'fs';
 import csv from 'csv-parser';
+import { slugify } from '../utils/slugify'; // Pastikan path ini benar
 
 interface VideoData {
   id: string;
@@ -35,17 +36,29 @@ async function getAllVideos(): Promise<VideoData[]> {
   });
 }
 
-// Ambil semua video dan batasi menjadi 20
+// Ambil semua video
 const allVideos = await getAllVideos();
-// Urutkan jika perlu, misalnya berdasarkan ID untuk mendapatkan yang terbaru
-// allVideos.sort((a, b) => parseInt(b.id) - parseInt(a.id)); 
 
-const limitedVideos = allVideos.slice(0, 20); // Hanya ambil 20 video pertama
+// Kelompokkan video berdasarkan category dan batasi hingga 10 per category
+const videosByCategory: { [key: string]: VideoData[] } = {};
+
+allVideos.forEach(video => {
+  if (!videosByCategory[video.category]) {
+    videosByCategory[video.category] = [];
+  }
+  // Hanya tambahkan jika jumlah video untuk category tersebut belum mencapai 10
+  if (videosByCategory[video.category].length < 10) {
+    videosByCategory[video.category].push(video);
+  }
+});
+
+// Urutkan category secara alfabetis untuk tampilan yang konsisten
+const sortedCategories = Object.keys(videosByCategory).sort();
 
 // Mendapatkan domain unik dari URL thumbnail dan video untuk preconnect
 // Hanya dari video yang akan ditampilkan di halaman ini
 const allDomains = new Set<string>();
-limitedVideos.forEach(video => {
+Object.values(videosByCategory).flat().forEach(video => {
   try {
     allDomains.add(new URL(video.thumbnail).origin);
     allDomains.add(new URL(video.videoUrl).origin);
@@ -62,8 +75,8 @@ const breadcrumbs = [
 ---
 
 <Layout
-  title="Video Portal - Koleksi Video Terbaik"
-  description="Temukan berbagai video menarik dari alam hingga kuliner, tonton sekarang!"
+  title="BokepSayang - Video Bokep Indo Terbaru"
+  description="Temukan berbagai video bokep indonesia mulai bokep bocil sampai ngentot tante!"
   preconnectDomains={preconnectDomains}
 >
   <main class="home-page">
@@ -86,26 +99,38 @@ const breadcrumbs = [
     </nav>
 
     <section class="hero-section">
-      <h1>Selamat Datang di Portal Video Kami!</h1>
-      <p>Temukan berbagai video menarik, dari alam hingga kuliner. Tonton sekarang juga!</p>
+      <h1>Selamat Datang di Video Bokep Sayang!</h1>
+      <p>Video bokep indonesia mulai bokep bocil sampai ngentot tante. Tonton sekarang juga!</p>
     </section>
 
-    <section class="latest-videos-section">
-      <h2>Video Terbaru</h2>
-      <div class="video-grid">
-        {limitedVideos.length === 0 ? (
-          <p class="no-videos">Belum ada video yang tersedia.</p>
-        ) : (
-          limitedVideos.map((video) => (
-            <VideoCard video={video} />
-          ))
-        )}
-      </div>
-      
-      {/* Kontrol Paginasi DIHILANGKAN */}
-      {/* Jika ada lebih dari 20 video dan Anda ingin menyarankan kategori atau "Lihat Semua", bisa ditambahkan di sini */}
-      {allVideos.length > 20 && (
-          <p class="suggestion-text">Lihat lebih banyak video di <a href="/kategori/" class="link-to-categories">halaman Kategori</a> kami!</p>
+    <section class="all-categories-section">
+      {sortedCategories.length === 0 ? (
+        <p class="no-videos-overall">Belum ada video yang tersedia di portal ini.</p>
+      ) : (
+        sortedCategories.map(categoryName => (
+          <div class="category-group">
+            <h2 class="category-title">
+              <a href={`/category/${slugify(categoryName)}/`} class="category-link">
+                {categoryName} &rarr;
+              </a>
+            </h2>
+            <div class="video-grid">
+              {videosByCategory[categoryName].length === 0 ? (
+                <p class="no-videos-in-category">Tidak ada video dalam category ini.</p>
+              ) : (
+                videosByCategory[categoryName].map((video) => (
+                  <VideoCard video={video} />
+                ))
+              )}
+            </div>
+            {/* Tampilkan tombol "Lihat Semua" jika ada lebih dari 10 video di category tersebut */}
+            {allVideos.filter(v => v.category === categoryName).length > 10 && (
+              <div class="view-all-button-container">
+                <a href={`/category/${slugify(categoryName)}/`} class="view-all-button">Lihat Semua di category {categoryName}</a>
+              </div>
+            )}
+          </div>
+        ))
       )}
     </section>
   </main>
@@ -164,29 +189,34 @@ const breadcrumbs = [
     opacity: 0.9;
   }
 
-  .latest-videos-section {
+  .all-categories-section {
     margin-top: 50px;
   }
 
-  .latest-videos-section h2 {
+  .category-group {
+    margin-bottom: 60px; /* Spasi antar grup category */
+  }
+
+  .category-title {
     font-size: clamp(1.8em, 3.5vw, 2.5em);
-    text-align: center;
-    margin-bottom: 30px;
+    text-align: left; /* Biarkan judul category di kiri */
+    margin-bottom: 25px;
     color: #333;
     position: relative;
     padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent-color); /* Garis bawah untuk judul category */
+    display: inline-block; /* Agar garis bawah hanya sepanjang teks */
+    padding-right: 15px; /* Sedikit padding untuk panah */
   }
 
-  .latest-videos-section h2::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 0;
-    width: 60px;
-    height: 4px;
-    background-color: var(--accent-color);
-    border-radius: 2px;
+  .category-title .category-link {
+    text-decoration: none;
+    color: inherit; /* Ikuti warna parent (h2) */
+    transition: color 0.2s ease;
+  }
+
+  .category-title .category-link:hover {
+    color: var(--primary-color);
   }
 
   .video-grid {
@@ -229,30 +259,35 @@ const breadcrumbs = [
     color: #999;
   }
 
-  .no-videos {
+  .no-videos-overall, .no-videos-in-category {
     grid-column: 1 / -1;
     text-align: center;
     font-size: 1.2em;
     color: #999;
     padding: 50px 0;
   }
-  
-  /* Gaya untuk teks saran */
-  .suggestion-text {
-    text-align: center;
-    margin-top: 40px;
-    font-size: 1.1em;
-    color: var(--text-color);
+
+  /* Gaya untuk tombol "Lihat Semua" */
+  .view-all-button-container {
+    text-align: right; /* Posisikan tombol di kanan */
+    margin-top: 20px;
   }
 
-  .suggestion-text .link-to-categories {
-    color: var(--primary-color);
+  .view-all-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: var(--accent-color); /* Warna hijau */
+    color: white;
     text-decoration: none;
-    font-weight: bold;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out, transform 0.2s ease;
+    box-shadow: var(--shadow-light);
   }
 
-  .suggestion-text .link-to-categories:hover {
-    text-decoration: underline;
+  .view-all-button:hover {
+    background-color: #218838; /* Warna hijau lebih gelap saat hover */
+    transform: translateY(-2px);
   }
 
   /* Responsive Adjustments */
@@ -266,6 +301,13 @@ const breadcrumbs = [
     }
     .hero-section {
       padding: 30px 15px;
+    }
+    .category-title {
+        text-align: center; /* Pusat judul category pada layar kecil */
+        display: block;
+    }
+    .view-all-button-container {
+        text-align: center; /* Pusat tombol pada layar kecil */
     }
   }
 
