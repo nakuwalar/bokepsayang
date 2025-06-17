@@ -184,7 +184,7 @@ const breadcrumbs = [
     if (isCurrent || isNearCurrent || isEdgePage) {
         return (
             // Ini penting! Pastikan ada satu elemen pembungkus di sini
-            <span> 
+            <span>
                 {showEllipsisBefore && <span class="ellipsis">...</span>}
                 <a
                     href={pageNum === 1 ? (page.url.current === '/' ? '/' : page.url.current.split('/page/')[0] + '/') : (page.url.current.split('/page/')[0] + '/page/' + pageNum + '/')}
