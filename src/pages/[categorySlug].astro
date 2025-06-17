@@ -1,10 +1,10 @@
 ---
-import Layout from '../../layouts/BaseLayout.astro'; // Adjust path if necessary
-import VideoCard from '../../components/VideoCard.astro'; // Adjust path if necessary
+import Layout from '../../layouts/BaseLayout.astro';
+import VideoCard from '../../components/VideoCard.astro';
 import path from 'path';
 import fs from 'fs';
 import csv from 'csv-parser';
-import { slugify } from '../../utils/slugify'; // Adjust path if necessary
+import { slugify } from '../../utils/slugify'; // Pastikan path benar
 
 interface VideoData {
   id: string;
@@ -13,104 +13,98 @@ interface VideoData {
   thumbnail: string;
   duration: string;
   videoUrl: string;
-  category: string; // Ensure this matches your CSV column name
+  category: string; // Pastikan ini ada di CSV Anda
 }
 
-// Function to read all videos from CSV
-async function getAllVideosFromCSV(): Promise<VideoData[]> {
+// Fungsi helper untuk membaca semua video dari CSV
+async function getAllVideos(): Promise<VideoData[]> {
   const results: VideoData[] = [];
   const csvFilePath = path.resolve(process.cwd(), 'src/data/videos.csv');
 
   return new Promise((resolve, reject) => {
     fs.createReadStream(csvFilePath)
-      .pipe(csv({ separator: ';' })) // Ensure separator matches your CSV
+      .pipe(csv({ separator: ';' }))
       .on('data', (data: VideoData) => results.push(data))
-      .on('end', () => {
-        console.log(`[INFO] Finished reading CSV for categories. Total videos: ${results.length}`);
-        resolve(results);
-      })
+      .on('end', () => resolve(results))
       .on('error', (error) => {
-        console.error("[ERROR] Failed to read CSV file for categories:", error);
+        console.error("Error reading CSV for category page:", error);
         reject(error);
       });
   });
 }
 
-// getStaticPaths to generate paginated pages for each unique category
+// getStaticPaths untuk membuat halaman paginasi per kategori
 export async function getStaticPaths({ paginate }) {
-  const allVideos = await getAllVideosFromCSV();
+  const allVideos = await getAllVideos();
 
-  // Get all unique categories
-  const uniqueCategories = [...new Set(allVideos.map((video) => video.category.trim()))];
+  // Dapatkan semua kategori unik dan slug-nya
+  const categories = new Set<string>();
+  allVideos.forEach(video => {
+    if (video.category) {
+      categories.add(video.category.trim());
+    }
+  });
 
   const paths = [];
 
-  // For each category, filter videos and then paginate them
-  for (const category of uniqueCategories) {
+  // Untuk setiap kategori, filter video dan lakukan paginasi
+  for (const category of Array.from(categories)) {
     const categorySlug = slugify(category);
     const videosInCategory = allVideos.filter(video => slugify(video.category) === categorySlug);
 
-    if (videosInCategory.length > 0) { // Only paginate categories with videos
-        paths.push(...paginate(videosInCategory, {
-            pageSize: 9, // 9 videos per page for categories
-            params: { categorySlug: categorySlug }, // URL parameter for the category
-            // Define the URL pattern for paginated category pages: /kategori/category-slug/2, /kategori/category-slug/3
-            // The first page will be /kategori/category-slug/
-            route: '/category/[categorySlug]/[page]', 
-            // Props for the original category name (useful for display)
-            props: { originalCategoryName: category } 
-        }));
-    }
+    // Lakukan paginasi untuk video dalam kategori ini
+    paths.push(...paginate(videosInCategory, {
+      pageSize: 3, // 12 video per halaman untuk kategori
+      params: { categorySlug: categorySlug }, // Parameter URL untuk kategori
+      // Optional: Buat URL custom untuk halaman paginasi kategori
+      // default: /kategori/[categorySlug]/page/[page]
+      // Ini akan membuat URL seperti /kategori/action/page/2
+      route: '/kategori/[categorySlug]/[page]', 
+    }));
   }
-  
-  console.log(`[INFO] Generated ${paths.length} category pages.`);
+
   return paths;
 }
 
-// Get props provided by Astro (from `paginate`)
-// 'categorySlug' is from params, 'page' is the pagination object, 'originalCategoryName' is from props
-const { categorySlug, page, originalCategoryName } = Astro.props;
+// Dapatkan prop dari Astro
+const { categorySlug, page } = Astro.props;
 
-// Determine the display name for the category
-const currentCategoryName = originalCategoryName || categorySlug; // Fallback to slug if original name isn't passed
+// Re-fetch video data untuk mendapatkan nama kategori asli
+// Atau passing nama kategori asli dari getStaticPaths jika ingin lebih efisien
+const allVideosForTitle = await getAllVideos();
+const originalCategoryName = allVideosForTitle.find(video => slugify(video.category) === categorySlug)?.category || categorySlug;
 
-// Get unique domains for preconnect from videos on the current page
-const preconnectDomains = Array.from(new Set<string>(
-  page.data.map(video => {
-    try {
-      return new URL(video.thumbnail).origin;
-    } catch (e) {
-      console.error(`[ERROR] Invalid thumbnail URL for video ID ${video.id} in category ${categorySlug}:`, e);
-      return ''; // Return empty string or handle error appropriately
-    }
-  }).filter(Boolean) // Filter out empty strings from errors
-));
 
+// Dapatkan domain unik dari URL thumbnail dan video untuk preconnect
+const allDomains = new Set<string>();
+page.data.forEach(video => {
+  try {
+    allDomains.add(new URL(video.thumbnail).origin);
+    allDomains.add(new URL(video.videoUrl).origin);
+  } catch (e) {
+    console.error(`[ERROR] URL tidak valid di CSV untuk video ID ${video.id} (Kategori ${categorySlug}):`, e);
+  }
+});
+const preconnectDomains = Array.from(allDomains);
 
 // Breadcrumb data
 const breadcrumbs = [
-  { name: 'Home', url: '/' },
-  // Assuming you might have a general categories listing page
-  { name: 'Category', url: '/category/' }, 
-  { name: currentCategoryName, url: `/category/${categorySlug}/` }
+  { name: 'Beranda', url: '/' },
+  { name: 'Kategori', url: '/kategori/' }, // Asumsi ada halaman daftar kategori
+  { name: originalCategoryName, url: `/kategori/${categorySlug}` }
 ];
 ---
 
 <Layout
   title={page.currentPage === 1 
-    ? `Kategori: ${currentCategoryName} | Video Portal` 
-    : `Kategori: ${currentCategoryName} - Halaman ${page.currentPage} | Video Portal`}
+    ? `${originalCategoryName} | Video Portal` 
+    : `Halaman ${page.currentPage} ${originalCategoryName} | Video Portal`}
   description={page.currentPage === 1 
-    ? `Kumpulan video terbaru dalam kategori ${currentCategoryName}.` 
-    : `Melanjutkan penjelajahan video dalam kategori ${currentCategoryName}, halaman ${page.currentPage}.`}
+    ? `Jelajahi koleksi video ${originalCategoryName} terbaru dan terpopuler.` 
+    : `Melanjutkan penjelajahan koleksi video ${originalCategoryName}, halaman ${page.currentPage}.`}
   preconnectDomains={preconnectDomains}
 >
-  <main class="category-page" itemscope itemtype="http://schema.org/CollectionPage">
-    <meta itemprop="name" content={`Video Kategori: ${currentCategoryName}`} />
-    <meta itemprop="description" content={`Kumpulan video dalam kategori ${currentCategoryName}.`} />
-    <meta itemprop="mainEntityOfPage" content={Astro.url.href} />
-
-    {/* Breadcrumb untuk Halaman Kategori */}
+  <main class="category-page">
     <nav class="breadcrumb" aria-label="breadcrumb" itemscope itemtype="http://schema.org/BreadcrumbList">
       <ol>
         {breadcrumbs.map((item, index) => (
@@ -136,25 +130,23 @@ const breadcrumbs = [
       </ol>
     </nav>
 
-    <section class="category-header">
-      <h1 itemprop="about" content={currentCategoryName}>Category: {currentCategoryName}</h1>
+    <section class="category-hero-section">
+      <h1>Video Kategori: {originalCategoryName}</h1>
+      <p>Temukan video-video menarik dalam kategori {originalCategoryName}.</p>
     </section>
 
-    <section class="video-grid-section">
-      <div class="video-grid" itemprop="hasPart" itemscope itemtype="http://schema.org/ItemList">
-        {page.data.length === 0 ? ( {/* Use page.data for current page videos */}
-          <p class="no-videos">Tidak ada video dalam kategori ini.</p>
+    <section class="category-videos-section">
+      <h2>Daftar Video</h2>
+      <div class="video-grid">
+        {page.data.length === 0 ? (
+          <p class="no-videos">Belum ada video dalam kategori ini.</p>
         ) : (
-          page.data.map((video, index) => ( {/* Use page.data for current page videos */}
-            <div itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
-              <meta itemprop="position" content={(page.currentPage - 1) * page.size + (index + 1)}.toString()} /> {/* Corrected position for Schema.org */}
-              <VideoCard video={video} />
-            </div>
+          page.data.map((video) => (
+            <VideoCard video={video} />
           ))
         )}
       </div>
 
-      {/* Pagination Controls */}
       <nav class="pagination-controls" aria-label="Navigasi Halaman Kategori">
         {page.url.prev && (
           <a href={page.url.prev} class="pagination-button prev-button">
@@ -162,43 +154,41 @@ const breadcrumbs = [
           </a>
         )}
         <div class="page-numbers">
-          {/* Loop to display page numbers with ellipsis logic */}
-{Array.from({ length: page.lastPage }, (_, i) => i + 1).map((pageNum) => {
-    const isCurrent = pageNum === page.currentPage;
-    const isNearCurrent = Math.abs(pageNum - page.currentPage) < 2;
-    const isEdgePage = pageNum === 1 || pageNum === page.lastPage;
+          {Array.from({ length: page.lastPage }, (_, i) => i + 1).map((pageNum) => {
+            const isCurrent = pageNum === page.currentPage;
+            const isNearCurrent = Math.abs(pageNum - page.currentPage) <= 2;
+            const isEdgePage = pageNum === 1 || pageNum === page.lastPage;
 
-    let showEllipsisBefore = false; // Set to false by default
-    let showEllipsisAfter = false;  // Set to false by default
+            let showEllipsisBefore = false;
+            let showEllipsisAfter = false;
 
-    if (page.lastPage > 7) {
-        if (pageNum === page.currentPage - 3 && page.currentPage > 1) {
-            showEllipsisBefore = true;
-        }
-        if (pageNum === page.currentPage + 3 && page.currentPage < page.lastPage) {
-            showEllipsisAfter = true;
-        }
-    }
+            if (page.lastPage > 7) {
+                if (pageNum === page.currentPage - 3 && page.currentPage > 1) {
+                    showEllipsisBefore = true;
+                }
+                if (pageNum === page.currentPage + 3 && page.currentPage < page.lastPage) {
+                    showEllipsisAfter = true;
+                }
+            }
 
-    if (isCurrent || isNearCurrent || isEdgePage) {
-        return (
-            // Ini penting! Pastikan ada satu elemen pembungkus di sini
-            <span>
-                {showEllipsisBefore && <span class="ellipsis">...</span>}
-                <a
-                    href={pageNum === 1 ? (page.url.current === '/' ? '/' : page.url.current.split('/page/')[0] + '/') : (page.url.current.split('/page/')[0] + '/page/' + pageNum + '/')}
+            if (isCurrent || isNearCurrent || isEdgePage) {
+              return (
+                <span>
+                  {showEllipsisBefore && <span class="ellipsis">...</span>}
+                  <a
+                    href={pageNum === 1 ? `/kategori/${categorySlug}/` : `/kategori/${categorySlug}/${pageNum}/`}
                     class={`page-number ${isCurrent ? 'active' : ''}`}
                     aria-current={isCurrent ? 'page' : undefined}
-                >
+                  >
                     {pageNum}
-                </a>
-                {showEllipsisAfter && <span class="ellipsis">...</span>}
-            </span>
-        );
-    } else {
-        return null;
-    }
-})}
+                  </a>
+                  {showEllipsisAfter && <span class="ellipsis">...</span>}
+                </span>
+              );
+            } else {
+              return null;
+            }
+          })}
         </div>
         {page.url.next && (
           <a href={page.url.next} class="pagination-button next-button">
@@ -206,34 +196,86 @@ const breadcrumbs = [
           </a>
         )}
       </nav>
-
     </section>
   </main>
 </Layout>
 
 <style>
-  /* Base styles (retained from your code) */
+  /* Anda bisa menggunakan kembali gaya dari index.astro atau menyesuaikannya */
+  :root {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --accent-color: #28a745;
+    --background-color: #f4f7f6;
+    --text-color: #343a40;
+    --border-color: #e9ecef;
+    --card-bg: #ffffff;
+    --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  body {
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+  }
+
   .category-page {
     max-width: 1200px;
-    margin: 0 auto;
+    margin: 30px auto;
     padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   }
 
-  .category-header {
+  .category-hero-section {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 40px 20px;
+    background: linear-gradient(to right, #6c757d, #495057); /* Warna berbeda untuk kategori */
+    color: white;
+    border-radius: 8px;
+    box-shadow: var(--shadow-medium);
+  }
+
+  .category-hero-section h1 {
+    font-size: clamp(2em, 4vw, 3.5em);
+    margin-bottom: 10px;
+    line-height: 1.2;
+  }
+
+  .category-hero-section p {
+    font-size: clamp(0.9em, 2.5vw, 1.4em);
+    opacity: 0.9;
+  }
+
+  .category-videos-section {
+    margin-top: 50px;
+  }
+
+  .category-videos-section h2 {
+    font-size: clamp(1.8em, 3.5vw, 2.5em);
     text-align: center;
     margin-bottom: 30px;
+    color: #333;
+    position: relative;
+    padding-bottom: 10px;
   }
 
-  .category-header h1 {
-    font-size: clamp(2em, 4vw, 3em);
-    color: #333;
-  }
-
-  .video-grid-section h2 {
-    font-size: clamp(1.8em, 3.5vw, 2.2em);
-    color: #333;
-    margin-bottom: 25px;
-    text-align: center;
+  .category-videos-section h2::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 0;
+    width: 60px;
+    height: 4px;
+    background-color: var(--secondary-color); /* Warna berbeda */
+    border-radius: 2px;
   }
 
   .video-grid {
@@ -250,44 +292,42 @@ const breadcrumbs = [
     padding: 50px 0;
   }
 
-  /* Responsive Adjustments (retained from your code) */
-  @media (max-width: 768px) {
-    .video-grid {
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 20px;
-    }
-    .category-page {
-      padding: 15px;
-    }
+  /* Gaya Breadcrumb (gunakan kembali dari index.astro) */
+  .breadcrumb {
+    margin-bottom: 20px;
+    font-size: 0.9em;
+    color: #666;
   }
 
-  @media (max-width: 480px) {
-    .video-grid {
-      grid-template-columns: 1fr;
-    }
+  .breadcrumb ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
   }
 
-  /* --- Pagination Styles (reused from index.astro with some adjustments) --- */
-  :root { /* Ensure these are defined, possibly in BaseLayout.astro or globally */
-    --primary-color: #007bff;
-    --secondary-color: #6c757d; /* Added for potential category styling */
-    --accent-color: #28a745;
-    --background-color: #f4f7f6;
-    --text-color: #343a40;
-    --border-color: #e9ecef;
-    --card-bg: #ffffff;
-    --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.05);
-    --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.1);
+  .breadcrumb li {
+    display: flex;
+    align-items: center;
   }
 
-  /* Added to ensure main content styling consistency if not already in Layout */
-  .category-page {
-    background-color: var(--card-bg); /* Match background of home page */
-    border-radius: 8px;
-    box-shadow: var(--shadow-medium);
-    margin: 30px auto; /* Center with margin */
+  .breadcrumb a {
+    color: var(--primary-color);
+    text-decoration: none;
+    white-space: nowrap;
   }
 
+  .breadcrumb a:hover {
+    text-decoration: underline;
+  }
+
+  .breadcrumb .separator {
+    margin: 0 8px;
+    color: #999;
+  }
+
+  /* Gaya Paginasi (gunakan kembali dari index.astro) */
   .pagination-controls {
     display: flex;
     justify-content: center;
@@ -370,8 +410,17 @@ const breadcrumbs = [
     font-weight: bold;
   }
 
-  /* Responsive Adjustments for Pagination */
   @media (max-width: 768px) {
+    .video-grid {
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .category-page {
+      padding: 15px;
+    }
+    .category-hero-section {
+      padding: 30px 15px;
+    }
     .pagination-controls {
       gap: 10px;
       justify-content: space-between;
@@ -391,6 +440,9 @@ const breadcrumbs = [
   }
 
   @media (max-width: 480px) {
+    .video-grid {
+      grid-template-columns: 1fr;
+    }
     .pagination-controls {
       flex-direction: row;
       justify-content: center;
