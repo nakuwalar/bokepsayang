@@ -1,0 +1,405 @@
+---
+import Layout from '../../layouts/BaseLayout.astro'; // Adjust path if necessary
+import VideoCard from '../../components/VideoCard.astro'; // Adjust path if necessary
+import path from 'path';
+import fs from 'fs';
+import csv from 'csv-parser';
+import { slugify } from '../../utils/slugify'; // Adjust path if necessary
+
+interface VideoData {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  duration: string;
+  videoUrl: string;
+  category: string; // Ensure this matches your CSV column name
+}
+
+// Function to read all videos from CSV
+async function getAllVideosFromCSV(): Promise<VideoData[]> {
+  const results: VideoData[] = [];
+  const csvFilePath = path.resolve(process.cwd(), 'src/data/videos.csv');
+
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(csvFilePath)
+      .pipe(csv({ separator: ';' })) // Ensure separator matches your CSV
+      .on('data', (data: VideoData) => results.push(data))
+      .on('end', () => {
+        console.log(`[INFO] Finished reading CSV for categories. Total videos: ${results.length}`);
+        resolve(results);
+      })
+      .on('error', (error) => {
+        console.error("[ERROR] Failed to read CSV file for categories:", error);
+        reject(error);
+      });
+  });
+}
+
+// getStaticPaths to generate paginated pages for each unique category
+export async function getStaticPaths({ paginate }) {
+  const allVideos = await getAllVideosFromCSV();
+
+  // Get all unique categories
+  const uniqueCategories = [...new Set(allVideos.map((video) => video.category.trim()))];
+
+  const paths = [];
+
+  // For each category, filter videos and then paginate them
+  for (const category of uniqueCategories) {
+    const categorySlug = slugify(category);
+    const videosInCategory = allVideos.filter(video => slugify(video.category) === categorySlug);
+
+    if (videosInCategory.length > 0) { // Only paginate categories with videos
+        paths.push(...paginate(videosInCategory, {
+            pageSize: 20, // 9 videos per page for categories
+            params: { categorySlug: categorySlug }, // URL parameter for the category
+            // Define the URL pattern for paginated category pages: /kategori/category-slug/2, /kategori/category-slug/3
+            // The first page will be /kategori/category-slug/
+            route: '/category/[categorySlug]/[page]', 
+            // Props for the original category name (useful for display)
+            props: { originalCategoryName: category } 
+        }));
+    }
+  }
+  
+  console.log(`[INFO] Generated ${paths.length} category pages.`);
+  return paths;
+}
+
+// Get props provided by Astro (from `paginate`)
+// 'categorySlug' is from params, 'page' is the pagination object, 'originalCategoryName' is from props
+const { categorySlug, page, originalCategoryName } = Astro.props;
+
+// Determine the display name for the category
+const currentCategoryName = originalCategoryName || categorySlug; // Fallback to slug if original name isn't passed
+
+// Get unique domains for preconnect from videos on the current page
+const preconnectDomains = Array.from(new Set<string>(
+  page.data.map(video => {
+    try {
+      return new URL(video.thumbnail).origin;
+    } catch (e) {
+      console.error(`[ERROR] Invalid thumbnail URL for video ID ${video.id} in category ${categorySlug}:`, e);
+      return ''; // Return empty string or handle error appropriately
+    }
+  }).filter(Boolean) // Filter out empty strings from errors
+));
+
+
+// Breadcrumb data
+const breadcrumbs = [
+  { name: 'Home', url: '/' },
+  // Assuming you might have a general categories listing page
+  { name: 'Category', url: '/category/' }, 
+  { name: currentCategoryName, url: `/category/${categorySlug}/` }
+];
+---
+
+<Layout
+  title={page.currentPage === 1 
+    ? `Kategori: ${currentCategoryName} | Video Portal` 
+    : `Kategori: ${currentCategoryName} - Halaman ${page.currentPage} | Video Portal`}
+  description={page.currentPage === 1 
+    ? `Kumpulan video terbaru dalam kategori ${currentCategoryName}.` 
+    : `Melanjutkan penjelajahan video dalam kategori ${currentCategoryName}, halaman ${page.currentPage}.`}
+  preconnectDomains={preconnectDomains}
+>
+  <main class="category-page" itemscope itemtype="http://schema.org/CollectionPage">
+    <meta itemprop="name" content={`Video Kategori: ${currentCategoryName}`} />
+    <meta itemprop="description" content={`Kumpulan video dalam kategori ${currentCategoryName}.`} />
+    <meta itemprop="mainEntityOfPage" content={Astro.url.href} />
+
+    {/* Breadcrumb untuk Halaman Kategori */}
+    <nav class="breadcrumb" aria-label="breadcrumb" itemscope itemtype="http://schema.org/BreadcrumbList">
+      <ol>
+        {breadcrumbs.map((item, index) => (
+          <li itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+            {index > 0 && <span class="separator">/</span>}
+            {item.url ? (
+              <a itemprop="item" href={item.url}>
+                <span itemprop="name">{item.name}</span>
+              </a>
+            ) : (
+              <span itemprop="name">{item.name}</span>
+            )}
+            <meta itemprop="position" content={(index + 1).toString()} />
+          </li>
+        ))}
+        {page.currentPage > 1 && (
+          <li itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+            <span class="separator">/</span>
+            <span itemprop="name">Halaman {page.currentPage}</span>
+            <meta itemprop="position" content={(breadcrumbs.length + 1).toString()} />
+          </li>
+        )}
+      </ol>
+    </nav>
+
+    <section class="category-header">
+      <h1 itemprop="about" content={currentCategoryName}>Category: {currentCategoryName}</h1>
+    </section>
+
+    <section class="video-grid-section">
+      <div class="video-grid" itemprop="hasPart" itemscope itemtype="http://schema.org/ItemList">
+        {page.data.length === 0 ? ( {/* Use page.data for current page videos */}
+          <p class="no-videos">Tidak ada video dalam kategori ini.</p>
+        ) : (
+          page.data.map((video, index) => ( {/* Use page.data for current page videos */}
+            <div itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+              <meta itemprop="position" content={(page.currentPage - 1) * page.size + (index + 1)}.toString()} /> {/* Corrected position for Schema.org */}
+              <VideoCard video={video} />
+            </div>
+          ))
+        )}
+      </div>
+
+      ---
+      {/* Pagination Controls */}
+      <nav class="pagination-controls" aria-label="Navigasi Halaman Kategori">
+        {page.url.prev && (
+          <a href={page.url.prev} class="pagination-button prev-button">
+            &larr; Sebelumnya
+          </a>
+        )}
+        <div class="page-numbers">
+          {/* Loop to display page numbers with ellipsis logic */}
+{Array.from({ length: page.lastPage }, (_, i) => i + 1).map((pageNum) => {
+    const isCurrent = pageNum === page.currentPage;
+    const isNearCurrent = Math.abs(pageNum - page.currentPage) <= 2;
+    const isEdgePage = pageNum === 1 || pageNum === page.lastPage;
+
+    let showEllipsisBefore = false; // Set to false by default
+    let showEllipsisAfter = false;  // Set to false by default
+
+    if (page.lastPage > 7) {
+        if (pageNum === page.currentPage - 3 && page.currentPage > 1) {
+            showEllipsisBefore = true;
+        }
+        if (pageNum === page.currentPage + 3 && page.currentPage < page.lastPage) {
+            showEllipsisAfter = true;
+        }
+    }
+
+    if (isCurrent || isNearCurrent || isEdgePage) {
+        return (
+            // Ini penting! Pastikan ada satu elemen pembungkus di sini
+            <span> 
+                {showEllipsisBefore && <span class="ellipsis">...</span>}
+                <a
+                    href={pageNum === 1 ? (page.url.current === '/' ? '/' : page.url.current.split('/page/')[0] + '/') : (page.url.current.split('/page/')[0] + '/page/' + pageNum + '/')}
+                    class={`page-number ${isCurrent ? 'active' : ''}`}
+                    aria-current={isCurrent ? 'page' : undefined}
+                >
+                    {pageNum}
+                </a>
+                {showEllipsisAfter && <span class="ellipsis">...</span>}
+            </span>
+        );
+    } else {
+        return null;
+    }
+})}
+        </div>
+        {page.url.next && (
+          <a href={page.url.next} class="pagination-button next-button">
+            Selanjutnya &rarr;
+          </a>
+        )}
+      </nav>
+      ---
+    </section>
+  </main>
+</Layout>
+
+<style>
+  /* Base styles (retained from your code) */
+  .category-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .category-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  .category-header h1 {
+    font-size: clamp(2em, 4vw, 3em);
+    color: #333;
+  }
+
+  .video-grid-section h2 {
+    font-size: clamp(1.8em, 3.5vw, 2.2em);
+    color: #333;
+    margin-bottom: 25px;
+    text-align: center;
+  }
+
+  .video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 25px;
+  }
+
+  .no-videos {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 1.2em;
+    color: #999;
+    padding: 50px 0;
+  }
+
+  /* Responsive Adjustments (retained from your code) */
+  @media (max-width: 768px) {
+    .video-grid {
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .category-page {
+      padding: 15px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .video-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* --- Pagination Styles (reused from index.astro with some adjustments) --- */
+  :root { /* Ensure these are defined, possibly in BaseLayout.astro or globally */
+    --primary-color: #007bff;
+    --secondary-color: #6c757d; /* Added for potential category styling */
+    --accent-color: #28a745;
+    --background-color: #f4f7f6;
+    --text-color: #343a40;
+    --border-color: #e9ecef;
+    --card-bg: #ffffff;
+    --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Added to ensure main content styling consistency if not already in Layout */
+  .category-page {
+    background-color: var(--card-bg); /* Match background of home page */
+    border-radius: 8px;
+    box-shadow: var(--shadow-medium);
+    margin: 30px auto; /* Center with margin */
+  }
+
+  .pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 50px;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+
+  .pagination-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: var(--primary-color);
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out, transform 0.2s ease;
+    box-shadow: var(--shadow-light);
+  }
+
+  .pagination-button:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+  }
+
+  .pagination-button.prev-button {
+    margin-right: auto;
+  }
+
+  .pagination-button.next-button {
+    margin-left: auto;
+  }
+
+  .page-numbers {
+    display: flex;
+    gap: 8px;
+  }
+
+  .page-number {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 8px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    text-decoration: none;
+    color: var(--text-color);
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  }
+
+  .page-number:hover {
+    background-color: #e9ecef;
+    border-color: var(--primary-color);
+  }
+
+  .page-number.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    cursor: default;
+    font-weight: bold;
+    box-shadow: var(--shadow-light);
+  }
+
+  .page-number.active:hover {
+    background-color: var(--primary-color);
+    color: white;
+  }
+
+  .ellipsis {
+    padding: 0 5px;
+    color: #888;
+    font-size: 1.2em;
+    font-weight: bold;
+  }
+
+  /* Responsive Adjustments for Pagination */
+  @media (max-width: 768px) {
+    .pagination-controls {
+      gap: 10px;
+      justify-content: space-between;
+    }
+    .pagination-button {
+      padding: 8px 15px;
+      font-size: 0.9em;
+    }
+    .page-numbers {
+      gap: 5px;
+    }
+    .page-number {
+      min-width: 35px;
+      height: 35px;
+      font-size: 0.9em;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .pagination-controls {
+      flex-direction: row;
+      justify-content: center;
+    }
+    .pagination-button.prev-button,
+    .pagination-button.next-button {
+      margin-left: 0;
+      margin-right: 0;
+    }
+  }
+</style>
