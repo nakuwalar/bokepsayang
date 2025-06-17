@@ -32,7 +32,7 @@ async function getAllVideos(): Promise<VideoData[]> {
 // getStaticPaths manual
 export async function getStaticPaths() {
   const allVideos = await getAllVideos();
-  const pageSize = 9; // Jumlah video per halaman
+  const pageSize = 20; // Jumlah video per halaman
   const totalPages = Math.ceil(allVideos.length / pageSize);
 
   const paths = [];
@@ -42,7 +42,7 @@ export async function getStaticPaths() {
     const end = start + pageSize;
     const paginatedVideos = allVideos.slice(start, end);
 
-    const urlPath = i === 1 ? '/' : `/halaman/${i}/`; // Contoh URL kustom
+    const urlPath = i === 1 ? '/' : `/page/${i}/`; // Contoh URL kustom
 
     paths.push({
       params: { page: i.toString() }, // 'page' akan menjadi parameter URL jika ada
@@ -51,8 +51,8 @@ export async function getStaticPaths() {
         currentPage: i,
         lastPage: totalPages,
         // Buat URL prev/next manual
-        prevUrl: i > 1 ? `/halaman/${i - 1}/` : null,
-        nextUrl: i < totalPages ? `/halaman/${i + 1}/` : null,
+        prevUrl: i > 1 ? `/page/${i - 1}/` : null,
+        nextUrl: i < totalPages ? `/page/${i + 1}/` : null,
       },
     });
   }
@@ -156,7 +156,7 @@ const breadcrumbs = [
                 <Fragment>
                   {showEllipsisBefore && <span class="ellipsis">...</span>}
                   <a
-                    href={pageNum === 1 ? '/' : `/halaman/${pageNum}/`}
+                    href={pageNum === 1 ? '/' : `/page/${pageNum}/`}
                     class={`page-number ${isCurrent ? 'active' : ''}`}
                     aria-current={isCurrent ? 'page' : undefined}
                   >
