@@ -130,7 +130,7 @@ const breadcrumbs = [
           {/* Loop untuk menampilkan nomor halaman */}
 {Array.from({ length: page.lastPage }, (_, i) => i + 1).map((pageNum) => {
     const isCurrent = pageNum === page.currentPage;
-    const isNearCurrent = Math.abs(pageNum - page.currentPage) <Fragment  2;
+    const isNearCurrent = Math.abs(pageNum - page.currentPage) <=2;
     const isEdgePage = pageNum === 1 || pageNum === page.lastPage;
 
     let showEllipsisBefore = false; // Set to false by default
