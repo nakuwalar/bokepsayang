@@ -33,11 +33,11 @@ async function getAllVideos(): Promise<VideoData[]> {
   });
 }
 
-// getStaticPaths untuk membuat halaman paginasi per kategori
+// getStaticPaths untuk membuat halaman paginasi per category
 export async function getStaticPaths({ paginate }) {
   const allVideos = await getAllVideos();
 
-  // Dapatkan semua kategori unik dan slug-nya
+  // Dapatkan semua category unik dan slug-nya
   const categories = new Set<string>();
   allVideos.forEach(video => {
     if (video.category) {
@@ -47,19 +47,19 @@ export async function getStaticPaths({ paginate }) {
 
   const paths = [];
 
-  // Untuk setiap kategori, filter video dan lakukan paginasi
+  // Untuk setiap category, filter video dan lakukan paginasi
   for (const category of Array.from(categories)) {
     const categorySlug = slugify(category);
     const videosInCategory = allVideos.filter(video => slugify(video.category) === categorySlug);
 
-    // Lakukan paginasi untuk video dalam kategori ini
+    // Lakukan paginasi untuk video dalam category ini
     paths.push(...paginate(videosInCategory, {
-      pageSize: 3, // 12 video per halaman untuk kategori
-      params: { categorySlug: categorySlug }, // Parameter URL untuk kategori
-      // Optional: Buat URL custom untuk halaman paginasi kategori
-      // default: /kategori/[categorySlug]/page/[page]
-      // Ini akan membuat URL seperti /kategori/action/page/2
-      route: '/kategori/[categorySlug]/[page]', 
+      pageSize: 3, // 12 video per halaman untuk category
+      params: { categorySlug: categorySlug }, // Parameter URL untuk category
+      // Optional: Buat URL custom untuk halaman paginasi category
+      // default: /category/[categorySlug]/page/[page]
+      // Ini akan membuat URL seperti /category/action/page/2
+      route: '/category/[categorySlug]/[page]', 
     }));
   }
 
@@ -69,8 +69,8 @@ export async function getStaticPaths({ paginate }) {
 // Dapatkan prop dari Astro
 const { categorySlug, page } = Astro.props;
 
-// Re-fetch video data untuk mendapatkan nama kategori asli
-// Atau passing nama kategori asli dari getStaticPaths jika ingin lebih efisien
+// Re-fetch video data untuk mendapatkan nama category asli
+// Atau passing nama category asli dari getStaticPaths jika ingin lebih efisien
 const allVideosForTitle = await getAllVideos();
 const originalCategoryName = allVideosForTitle.find(video => slugify(video.category) === categorySlug)?.category || categorySlug;
 
@@ -82,7 +82,7 @@ page.data.forEach(video => {
     allDomains.add(new URL(video.thumbnail).origin);
     allDomains.add(new URL(video.videoUrl).origin);
   } catch (e) {
-    console.error(`[ERROR] URL tidak valid di CSV untuk video ID ${video.id} (Kategori ${categorySlug}):`, e);
+    console.error(`[ERROR] URL tidak valid di CSV untuk video ID ${video.id} (category ${categorySlug}):`, e);
   }
 });
 const preconnectDomains = Array.from(allDomains);
@@ -90,8 +90,8 @@ const preconnectDomains = Array.from(allDomains);
 // Breadcrumb data
 const breadcrumbs = [
   { name: 'Beranda', url: '/' },
-  { name: 'Kategori', url: '/kategori/' }, // Asumsi ada halaman daftar kategori
-  { name: originalCategoryName, url: `/kategori/${categorySlug}` }
+  { name: 'category', url: '/category/' }, // Asumsi ada halaman daftar category
+  { name: originalCategoryName, url: `/category/${categorySlug}` }
 ];
 ---
 
@@ -131,15 +131,15 @@ const breadcrumbs = [
     </nav>
 
     <section class="category-hero-section">
-      <h1>Video Kategori: {originalCategoryName}</h1>
-      <p>Temukan video-video menarik dalam kategori {originalCategoryName}.</p>
+      <h1>Video category: {originalCategoryName}</h1>
+      <p>Temukan video-video menarik dalam category {originalCategoryName}.</p>
     </section>
 
     <section class="category-videos-section">
       <h2>Daftar Video</h2>
       <div class="video-grid">
         {page.data.length === 0 ? (
-          <p class="no-videos">Belum ada video dalam kategori ini.</p>
+          <p class="no-videos">Belum ada video dalam category ini.</p>
         ) : (
           page.data.map((video) => (
             <VideoCard video={video} />
@@ -147,7 +147,7 @@ const breadcrumbs = [
         )}
       </div>
 
-      <nav class="pagination-controls" aria-label="Navigasi Halaman Kategori">
+      <nav class="pagination-controls" aria-label="Navigasi Halaman category">
         {page.url.prev && (
           <a href={page.url.prev} class="pagination-button prev-button">
             &larr; Sebelumnya
@@ -176,7 +176,7 @@ const breadcrumbs = [
                 <span>
                   {showEllipsisBefore && <span class="ellipsis">...</span>}
                   <a
-                    href={pageNum === 1 ? `/kategori/${categorySlug}/` : `/kategori/${categorySlug}/${pageNum}/`}
+                    href={pageNum === 1 ? `/category/${categorySlug}/` : `/category/${categorySlug}/${pageNum}/`}
                     class={`page-number ${isCurrent ? 'active' : ''}`}
                     aria-current={isCurrent ? 'page' : undefined}
                   >
@@ -236,7 +236,7 @@ const breadcrumbs = [
     text-align: center;
     margin-bottom: 40px;
     padding: 40px 20px;
-    background: linear-gradient(to right, #6c757d, #495057); /* Warna berbeda untuk kategori */
+    background: linear-gradient(to right, #6c757d, #495057); /* Warna berbeda untuk category */
     color: white;
     border-radius: 8px;
     box-shadow: var(--shadow-medium);
