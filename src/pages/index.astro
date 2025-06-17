@@ -153,7 +153,7 @@ const breadcrumbs = [
 
             if (isCurrent || isNearCurrent || isEdgePage) {
               return (
-                <span>
+                <Fragment>
                   {showEllipsisBefore && <span class="ellipsis">...</span>}
                   <a
                     href={pageNum === 1 ? '/' : `/halaman/${pageNum}/`}
@@ -163,7 +163,7 @@ const breadcrumbs = [
                     {pageNum}
                   </a>
                   {showEllipsisAfter && <span class="ellipsis">...</span>}
-                </span>
+                </Fragment>
               );
             } else {
               return null;
