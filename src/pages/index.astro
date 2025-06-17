@@ -71,7 +71,7 @@ const breadcrumbs = [
 ---
 
 <Layout
-  title={page.currentPage === 1 ? "BokepSayang - Video Bokep Indo Terbaru" : `Halaman ${page.currentPage} | Video Portal`}
+  title={page.currentPage === 1 ? "BokepSayang - Video Bokep Indo Terbaru" : `Halaman ${page.currentPage} | BokepSayang`}
   description={page.currentPage === 1 ? "Temukan berbagai video bokep indonesia mulai bokep bocil sampai ngentot tante!" : `Melanjutkan penjelajahan video, halaman ${page.currentPage}.`}
   preconnectDomains={preconnectDomains}
 >
@@ -130,7 +130,7 @@ const breadcrumbs = [
           {/* Loop untuk menampilkan nomor halaman */}
 {Array.from({ length: page.lastPage }, (_, i) => i + 1).map((pageNum) => {
     const isCurrent = pageNum === page.currentPage;
-    const isNearCurrent = Math.abs(pageNum - page.currentPage) <= 2;
+    const isNearCurrent = Math.abs(pageNum - page.currentPage) <Fragment  2;
     const isEdgePage = pageNum === 1 || pageNum === page.lastPage;
 
     let showEllipsisBefore = false; // Set to false by default
