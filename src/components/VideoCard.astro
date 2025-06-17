@@ -32,7 +32,7 @@ const videoUrl = `/${video.id}/${videoSlug}`; // URL ke halaman detail video
       style="aspect-ratio: 16/9; object-fit: cover;"
       itemprop="thumbnailUrl"
     />
-    <span class="duration" itemprop="duration" content={`PT${video.duration.replace(':', 'M')}S`}>{video.duration}</span>
+    <span class="duration" itemprop="duration" content={`PT${video.duration.replace(':', 'M')}S`}>{video.durationISO}</span>
     {/* Format duration ke ISO 8601, misal 03:15 -> PT3M15S */}
   </div>
   <h3 class="title" itemprop="name">{video.title}</h3>
