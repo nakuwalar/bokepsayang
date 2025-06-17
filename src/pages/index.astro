@@ -4,6 +4,7 @@ import VideoCard from '../components/VideoCard.astro';
 import path from 'path';
 import fs from 'fs';
 import csv from 'csv-parser';
+import { Fragment } from 'astro/jsx-runtime'; // Tambahkan ini di bagian frontmatter
 
 interface VideoData {
   id: string;
@@ -135,7 +136,7 @@ const breadcrumbs = [
         <div class="page-numbers">
           {Array.from({ length: lastPage }, (_, i) => i + 1).map((pageNum) => {
             const isCurrent = pageNum === currentPage;
-            const isNearCurrent = Math.abs(pageNum - currentPage) <= 2;
+            const isNearCurrent = Math.abs(pageNum - currentPage) < 2;
             const isEdgePage = pageNum === 1 || pageNum === lastPage;
 
             let showEllipsisBefore = false;
