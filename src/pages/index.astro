@@ -4,7 +4,6 @@ import VideoCard from '../components/VideoCard.astro';
 import path from 'path';
 import fs from 'fs';
 import csv from 'csv-parser';
-import { Fragment } from 'astro/jsx-runtime'; // Tambahkan ini di bagian frontmatter
 
 interface VideoData {
   id: string;
@@ -16,55 +15,37 @@ interface VideoData {
   category: string;
 }
 
+// Fungsi helper untuk membaca semua video dari CSV
 async function getAllVideos(): Promise<VideoData[]> {
   const results: VideoData[] = [];
   const csvFilePath = path.resolve(process.cwd(), 'src/data/videos.csv');
 
   return new Promise((resolve, reject) => {
     fs.createReadStream(csvFilePath)
-      .pipe(csv({ separator: ';' }))
+      .pipe(csv({ separator: ';' })) // Pastikan separator sesuai
       .on('data', (data: VideoData) => results.push(data))
-      .on('end', () => resolve(results))
-      .on('error', (error) => reject(error));
+      .on('end', () => {
+        console.log(`[INFO] Selesai membaca CSV. Total video ditemukan: ${results.length}`);
+        resolve(results);
+      })
+      .on('error', (error) => {
+        console.error("[ERROR] Gagal membaca file CSV:", error);
+        reject(error);
+      });
   });
 }
 
-// getStaticPaths manual
-export async function getStaticPaths() {
-  const allVideos = await getAllVideos();
-  const pageSize = 20; // Jumlah video per halaman
-  const totalPages = Math.ceil(allVideos.length / pageSize);
+// Ambil semua video dan batasi menjadi 20
+const allVideos = await getAllVideos();
+// Urutkan jika perlu, misalnya berdasarkan ID untuk mendapatkan yang terbaru
+// allVideos.sort((a, b) => parseInt(b.id) - parseInt(a.id)); 
 
-  const paths = [];
+const limitedVideos = allVideos.slice(0, 20); // Hanya ambil 20 video pertama
 
-  for (let i = 1; i <= totalPages; i++) {
-    const start = (i - 1) * pageSize;
-    const end = start + pageSize;
-    const paginatedVideos = allVideos.slice(start, end);
-
-    const urlPath = i === 1 ? '/' : `/page/${i}/`; // Contoh URL kustom
-
-    paths.push({
-      params: { page: i.toString() }, // 'page' akan menjadi parameter URL jika ada
-      props: {
-        videos: paginatedVideos,
-        currentPage: i,
-        lastPage: totalPages,
-        // Buat URL prev/next manual
-        prevUrl: i > 1 ? `/page/${i - 1}/` : null,
-        nextUrl: i < totalPages ? `/page/${i + 1}/` : null,
-      },
-    });
-  }
-  return paths;
-}
-
-// Dapatkan props dari getStaticPaths
-const { videos, currentPage, lastPage, prevUrl, nextUrl } = Astro.props;
-
-// Logika preconnectDomains dan breadcrumbs tetap sama
+// Mendapatkan domain unik dari URL thumbnail dan video untuk preconnect
+// Hanya dari video yang akan ditampilkan di halaman ini
 const allDomains = new Set<string>();
-videos.forEach(video => {
+limitedVideos.forEach(video => {
   try {
     allDomains.add(new URL(video.thumbnail).origin);
     allDomains.add(new URL(video.videoUrl).origin);
@@ -74,14 +55,15 @@ videos.forEach(video => {
 });
 const preconnectDomains = Array.from(allDomains);
 
+// Breadcrumb data
 const breadcrumbs = [
   { name: 'Beranda', url: '/' },
 ];
 ---
 
 <Layout
-  title={currentPage === 1 ? "Video Portal - Koleksi Video Terbaik" : `Halaman ${currentPage} | Video Portal`}
-  description={currentPage === 1 ? "Jelajahi koleksi video terbaru dan terpopuler dari berbagai kategori." : `Melanjutkan penjelajahan koleksi video, halaman ${currentPage}.`}
+  title="Video Portal - Koleksi Video Terbaik"
+  description="Temukan berbagai video menarik dari alam hingga kuliner, tonton sekarang!"
   preconnectDomains={preconnectDomains}
 >
   <main class="home-page">
@@ -100,88 +82,37 @@ const breadcrumbs = [
             <meta itemprop="position" content={(index + 1).toString()} />
           </li>
         ))}
-        {currentPage > 1 && (
-          <li itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
-            <span class="separator">/</span>
-            <span itemprop="name">Halaman {currentPage}</span>
-            <meta itemprop="position" content={(breadcrumbs.length + 1).toString()} />
-          </li>
-        )}
       </ol>
     </nav>
 
     <section class="hero-section">
-      <h1>Selamat Datang di Video Portal!</h1>
-      <p>Jelajahi video-video menarik dari berbagai kategori.</p>
+      <h1>Selamat Datang di Portal Video Kami!</h1>
+      <p>Temukan berbagai video menarik, dari alam hingga kuliner. Tonton sekarang juga!</p>
     </section>
 
     <section class="latest-videos-section">
       <h2>Video Terbaru</h2>
       <div class="video-grid">
-        {videos.length === 0 ? (
-          <p class="no-videos">Belum ada video yang tersedia di halaman ini.</p>
+        {limitedVideos.length === 0 ? (
+          <p class="no-videos">Belum ada video yang tersedia.</p>
         ) : (
-          videos.map((video) => (
+          limitedVideos.map((video) => (
             <VideoCard video={video} />
           ))
         )}
       </div>
-
-      <nav class="pagination-controls" aria-label="Navigasi Halaman Video">
-        {prevUrl && (
-          <a href={prevUrl} class="pagination-button prev-button">
-            &larr; Sebelumnya
-          </a>
-        )}
-        <div class="page-numbers">
-          {Array.from({ length: lastPage }, (_, i) => i + 1).map((pageNum) => {
-            const isCurrent = pageNum === currentPage;
-            const isNearCurrent = Math.abs(pageNum - currentPage) < 2;
-            const isEdgePage = pageNum === 1 || pageNum === lastPage;
-
-            let showEllipsisBefore = false;
-            let showEllipsisAfter = false;
-
-            if (lastPage > 7) {
-                if (pageNum === currentPage - 3 && currentPage > 1) {
-                    showEllipsisBefore = true;
-                }
-                if (pageNum === currentPage + 3 && currentPage < lastPage) {
-                    showEllipsisAfter = true;
-                }
-            }
-
-            if (isCurrent || isNearCurrent || isEdgePage) {
-              return (
-                <Fragment>
-                  {showEllipsisBefore && <span class="ellipsis">...</span>}
-                  <a
-                    href={pageNum === 1 ? '/' : `/page/${pageNum}/`}
-                    class={`page-number ${isCurrent ? 'active' : ''}`}
-                    aria-current={isCurrent ? 'page' : undefined}
-                  >
-                    {pageNum}
-                  </a>
-                  {showEllipsisAfter && <span class="ellipsis">...</span>}
-                </Fragment>
-              );
-            } else {
-              return null;
-            }
-          })}
-        </div>
-        {nextUrl && (
-          <a href={nextUrl} class="pagination-button next-button">
-            Selanjutnya &rarr;
-          </a>
-        )}
-      </nav>
+      
+      {/* Kontrol Paginasi DIHILANGKAN */}
+      {/* Jika ada lebih dari 20 video dan Anda ingin menyarankan kategori atau "Lihat Semua", bisa ditambahkan di sini */}
+      {allVideos.length > 20 && (
+          <p class="suggestion-text">Lihat lebih banyak video di <a href="/kategori/" class="link-to-categories">halaman Kategori</a> kami!</p>
+      )}
     </section>
   </main>
 </Layout>
 
 <style>
-  /* Gaya CSS tetap sama dengan versi paginasi sebelumnya */
+  /* Pertahankan gaya dasar dari sebelumnya */
   :root {
     --primary-color: #007bff;
     --secondary-color: #6c757d;
@@ -305,90 +236,26 @@ const breadcrumbs = [
     color: #999;
     padding: 50px 0;
   }
-
-  /* --- Gaya Paginasi --- */
-  .pagination-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 50px;
-    gap: 15px;
-    flex-wrap: wrap;
-  }
-
-  .pagination-button {
-    display: inline-flex;
-    align-items: center;
-    padding: 10px 20px;
-    background-color: var(--primary-color);
-    color: white;
-    text-decoration: none;
-    border-radius: 5px;
-    font-weight: 500;
-    transition: background-color 0.2s ease-in-out, transform 0.2s ease;
-    box-shadow: var(--shadow-light);
-  }
-
-  .pagination-button:hover {
-    background-color: #0056b3;
-    transform: translateY(-2px);
-  }
-
-  .pagination-button.prev-button {
-    margin-right: auto;
-  }
-
-  .pagination-button.next-button {
-    margin-left: auto;
-  }
-
-  .page-numbers {
-    display: flex;
-    gap: 8px;
-  }
-
-  .page-number {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-width: 40px;
-    height: 40px;
-    padding: 0 8px;
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    text-decoration: none;
+  
+  /* Gaya untuk teks saran */
+  .suggestion-text {
+    text-align: center;
+    margin-top: 40px;
+    font-size: 1.1em;
     color: var(--text-color);
-    font-weight: 500;
-    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
   }
 
-  .page-number:hover {
-    background-color: #e9ecef;
-    border-color: var(--primary-color);
-  }
-
-  .page-number.active {
-    background-color: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-    cursor: default;
-    font-weight: bold;
-    box-shadow: var(--shadow-light);
-  }
-
-  .page-number.active:hover {
-    background-color: var(--primary-color);
-    color: white;
-  }
-
-  .ellipsis {
-    padding: 0 5px;
-    color: #888;
-    font-size: 1.2em;
+  .suggestion-text .link-to-categories {
+    color: var(--primary-color);
+    text-decoration: none;
     font-weight: bold;
   }
 
+  .suggestion-text .link-to-categories:hover {
+    text-decoration: underline;
+  }
+
+  /* Responsive Adjustments */
   @media (max-width: 768px) {
     .video-grid {
       grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -399,22 +266,6 @@ const breadcrumbs = [
     }
     .hero-section {
       padding: 30px 15px;
-    }
-    .pagination-controls {
-      gap: 10px;
-      justify-content: space-between;
-    }
-    .pagination-button {
-      padding: 8px 15px;
-      font-size: 0.9em;
-    }
-    .page-numbers {
-      gap: 5px;
-    }
-    .page-number {
-      min-width: 35px;
-      height: 35px;
-      font-size: 0.9em;
     }
   }
 
