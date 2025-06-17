@@ -52,7 +52,7 @@ export async function getStaticPaths({ paginate }) {
 
     if (videosInCategory.length > 0) { // Only paginate categories with videos
         paths.push(...paginate(videosInCategory, {
-            pageSize: 20, // 9 videos per page for categories
+            pageSize: 9, // 9 videos per page for categories
             params: { categorySlug: categorySlug }, // URL parameter for the category
             // Define the URL pattern for paginated category pages: /kategori/category-slug/2, /kategori/category-slug/3
             // The first page will be /kategori/category-slug/
@@ -166,7 +166,7 @@ const breadcrumbs = [
           {/* Loop to display page numbers with ellipsis logic */}
 {Array.from({ length: page.lastPage }, (_, i) => i + 1).map((pageNum) => {
     const isCurrent = pageNum === page.currentPage;
-    const isNearCurrent = Math.abs(pageNum - page.currentPage) <= 2;
+    const isNearCurrent = Math.abs(pageNum - page.currentPage) < 2;
     const isEdgePage = pageNum === 1 || pageNum === page.lastPage;
 
     let showEllipsisBefore = false; // Set to false by default
