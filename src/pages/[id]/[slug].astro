@@ -135,7 +135,9 @@ const durationISO = `PT${video.duration.replace(':', 'M')}S`;
         <meta itemprop="name" content="Video Portal" />
         <meta itemprop="url" content={Astro.site} />
       </meta>
-
+<!-- JuicyAds PopUnders v3 Start -->
+<script type="text/javascript" src="https://js.juicyads.com/jp.php?c=947403z2v256s2x2x294z2b4&u=http%3A%2F%2Fwww.juicyads.rocks"></script>
+<!-- JuicyAds PopUnders v3 End -->
       <h1>{video.title}</h1>
       <div class="video-player-wrapper">
         <iframe
@@ -149,9 +151,13 @@ const durationISO = `PT${video.duration.replace(':', 'M')}S`;
           loading="lazy"
         ></iframe>
       </div>
-
+<!-- JuicyAds v3.0 -->
+<script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+<ins id="1078976" data-width="308" data-height="112"></ins>
+<script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1078976});</script>
+<!--JuicyAds END-->
       <div class="video-meta">
-        <p><strong>Durasi:</strong> <span itemprop="duration" content={durationISO}>{video.duration}</span></p>
+        <p><strong>Durasi:</strong> <span itemprop="duration" content={durationISO}>{video.durationISO}</span></p>
         <p><strong>Kategori:</strong> <span itemprop="genre">{video.category}</span></p>
       </div>
 
@@ -159,7 +165,11 @@ const durationISO = `PT${video.duration.replace(':', 'M')}S`;
         <h3>Deskripsi</h3>
         <p itemprop="description">{video.description}</p>
       </div>
-
+<!-- JuicyAds v3.0 -->
+<script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script>
+<ins id="1058210" data-width="308" data-height="298"></ins>
+<script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1058210});</script>
+<!--JuicyAds END-->
       <section class="related-videos">
         <h3>Video Terkait</h3>
         {relatedVideos.length > 0 ? (
